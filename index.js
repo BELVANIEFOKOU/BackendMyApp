@@ -1,17 +1,18 @@
-// Importation du module session pour la gestion des sessions et envoi des cookies
-const session = require("express-session");
-// Syntaxe par defaut de l'importation d'un store mysql pour express-session
-const MySQLStore = require("express-mysql-session")(session);
-const mysql = require("mysql");
-const { check, validationResult } = require("express-validator");
 const express = require("express");
-const app = express();
+const session = require("express-session");
+const { check, validationResult } = require("express-validator");
+const mysql = require("mysql");
 const bcrypt = require("bcrypt");
-const port = 3000;
-const { v4: uuidv4 } = require("uuid");
 const cors = require("cors");
-// Autoriser les requetes venant d'autres sources(par example flutter)
+const { v4: uuidv4 } = require("uuid");
+
+const MySQLStore = require("express-mysql-session")(session);
+
+const app = express();
 app.use(cors());
+
+const port = 3000;
+
 const mysqlconnection = mysql.createConnection({
   host: "localhost",
   user: "root",
@@ -47,6 +48,9 @@ app.use(
     },
   })
 );
+
+// ========================== REGISTER USER ENDPOINT.
+
 app.post(
   "/inscription",
   [
@@ -103,25 +107,24 @@ app.post(
     } else {
       const hashedPassword = await bcrypt.hash(req.body.mdpCompte, 10);
       const uuid = uuidv4();
+      // Creating basic raw account
       const sql =
         "INSERT INTO compte(idCompte, emailCompte, mdpCompte,  typeCompte) VALUES (?,?, ?, ?)";
       var valeur = [
         uuid,
-        //  req.body.nomCompte,
         req.body.emailCompte,
         hashedPassword,
-        //  req.body.telCompte,
         req.body.typeCompte,
       ];
       mysqlconnection.query(sql, valeur, (err, data) => {
         if (err) {
           res.json({ inscrit: false, ...err });
         } else {
-          // checking and creating sub
+          // Checking If Raw Account Is Present And Creating Sub With These Information
           const nom = req.body.nom;
           const telephone = req.body.telephone;
+          // Checking If User Want To Create A Particular Account
           if (req.body.typeCompte === "particulier") {
-            console.log("Particulier ahead");
             const sql =
               "INSERT INTO particulier (id, nom, telephone) VALUES (?,?,?)";
             const valeur = [uuid, nom, telephone];
@@ -129,8 +132,8 @@ app.post(
               if (err) {
                 res.json({ inscrit: false, ...err });
               } else {
-                console.log("Bienvenue" + nom);
-                res.json(data);
+                console.log("Welcome Particular Account ->" + nom);
+                res.json({inscrit: true, ...data});
               }
             });
           }
@@ -138,8 +141,8 @@ app.post(
           const villeAgent = req.body.villeAgent;
           const businessRegistrationNumber =
             req.body.businessRegistrationNumber;
+          // If it's Agent Account
           if (req.body.typeCompte === "agent") {
-            console.log("agent ahead");
             const sql =
               "INSERT INTO agent (id, nom, telephone,cniAgent,villeAgent,businessRegistrationNumber) VALUES (?,?,?,?,?,?)";
             const valeur = [
@@ -154,63 +157,29 @@ app.post(
               if (err) {
                 res.json({ inscrit: false, ...err });
               } else {
-                console.log("Bienvenue agent" + nom);
-                res.json(data);
+                console.log("Welcome Profile Agent" + nom);
+                res.json({inscrit: true, ...data});
               }
             });
           }
-          // res.json({ inscrit: true });
+          res.json({ inscrit: false });
         }
       });
     }
+    res.json({ inscrit: false });
   }
 );
 
-//  connexion
-// app.post("/connexion", (req, res) => {
-//   const sql = `SELECT * FROM compte WHERE emailCompte = ?`;
-//   const valeur = [req.body.emailCompte];
-//   console.log(req.body.emailCompte);
-//   mysqlconnection.query(sql, valeur, async (err, data) => {
-//     if (err) {
-//       res.json({ connected: false, msg: `erreur sur le serveur` });
-//     } else {
-//       if (data.length > 0) {
-//         // Comparer le mot de passe entré avec le mot de passe haché
-//         const isPasswordValid = await bcrypt.compare(req.body.mdpCompte, data[0].mdpCompte);
-//         console.log(req.body.mdpCompte);
-//         if (isPasswordValid) {
-//           req.session.nomCompte = data[0].nomCompte;
+// ======================== CONNEXION ENDPOINT.
 
-//           res.json({ connected: true, msg: `bienvenue sur la plateforme` });
-//         } else {
-//           res.json({
-//             connected: false,
-//             msg: `veuillez verifier vos informations`,
-//           });
-//         }
-//       } else {
-//         res.json({
-//           connected: false,
-//           msg: `veuillez verifier vos informations`,
-//         });
-//       }
-//     }
-//   });
-// });
 app.post("/connexion", (req, res) => {
   const sql = `SELECT * FROM compte WHERE emailCompte = ?`;
   const valeur = [req.body.emailCompte];
-  console.log(sql, valeur);
-  console.log(req.body.emailCompte);
-  console.log(req.body.mdpCompte);
 
   mysqlconnection.query(sql, valeur, async (err, data) => {
     if (err) {
-      console.log(err);
       res.json({ connected: false, msg: `erreur sur le serveur` });
     } else {
-      console.log(data);
       if (data.length > 0) {
         const isPasswordValid = await bcrypt.compare(
           req.body.mdpCompte,
@@ -220,7 +189,6 @@ app.post("/connexion", (req, res) => {
         console.log(isPasswordValid);
         if (!isPasswordValid) {
           req.session.nomCompte = data[0].nomCompte;
-
           res.json({ connected: true, msg: `bienvenue sur la plateforme` });
         } else {
           res.json({
@@ -248,9 +216,9 @@ app.get("/", (req, res) => {
     console.log(`il doit d'abord se connecter`);
   }
 });
+
+// ========================== DISCONNECTING USER ENDPOINT.
 app.post("/deconnexion", (req, res) => {
-  // req.session.destroy()
-  // req.session.destroy() supprime uniquement la session sans supprimer le cookie
   req.session.destroy((err) => {
     if (err) {
       console.log(`Deconnexion Echoué`);
@@ -261,16 +229,13 @@ app.post("/deconnexion", (req, res) => {
   });
 });
 
-// code de l'ajout
-
-// Create (Add) function
+// ============================ SET NEW PROPRIETIE ENDPOINT ROUTE.
 app.post("/ajouterPropriete", async (req, res) => {
   const propriete = req.body;
   try {
     const checkQuery = `SELECT * from propriete WHERE libellePropriete=?`;
     mysqlconnection.query(
       checkQuery,
-      // [propriete.libellePropriete],
       [req.body.libellePropriete],
       (err, data) => {
         let count = data.length;
@@ -322,14 +287,12 @@ app.post("/ajouterPropriete", async (req, res) => {
 app.get("/rechercheLogement", (req, res) => {
   const sql = `SELECT * FROM propriete  WHERE quartierPropriete='valeur20 ' `;
 
-  console.log(sql);
-  // Envoi de la requette a la BD
   mysqlconnection.query(sql, (err, data) => {
     err ? res.json(err) : res.json(data);
   });
 });
-// recherche selective
 
+// ============================ SEARCHING LOGMENT ENDPOINT ROUTE.
 app.get("/rechercheLogement2", async (req, res) => {
   try {
     const { villePropriete } = req.query;
@@ -379,70 +342,6 @@ app.get("/rechercheLogement2", async (req, res) => {
       .status(500)
       .json({ message: "Erreur lors de la recherche de logements" });
   }
-});
-// app.get("/rechercheLogement2", async (req, res) => {
-//   console.log(req.params);
-//   try {
-//     const { villePropriete } = req.params;
-//     const { quartierPropriete, prixPropriete, statutPropriete } = req.query;
-
-//     let sql = "SELECT * FROM propriete WHERE quartierPropriete='valeur22'";
-//     const values = [];
-
-//     // if (villePropriete) {
-//     //   sql += ` AND villePropriete LIKE ?`;
-//     //   values.push(`%${villePropriete}%`);
-//     // }
-//     // if (quartierPropriete) {
-//     //   sql += " AND quartierPropriete LIKE ?";
-//     //   values.push(`%${quartierPropriete}%`);
-//     // }
-//     // if (prixPropriete) {
-//     //   sql += " AND prixPropriete <= ?";
-//     //   values.push(prixPropriete);
-//     // }
-//     // // if (superficiePropriete) {
-//     // //   sql += " AND superficiePropriete >= ?";
-//     // //   values.push(superficiePropriete);
-//     // // }
-//     // if (statutPropriete) {
-//     //   sql += " AND statutPropriete = ?";
-//     //   values.push(statutPropriete);
-//     // }
-
-//     console.log("SQL:", sql);
-//     console.log("Values:", values);
-
-//     const results = mysqlconnection.query(sql, values);
-
-//     console.log("le résultat est: ", results);
-
-//     mysqlconnection.query(sql, values, async (err, data) => {
-//       if (err) {
-//         res.json({ recherche: false, msg: `erreur sur le serveur` });
-//       } else {
-//         if (data.length > 0) {
-//           res.json({ recherche: true, msg: `recheche effectué avec succès` });
-//         }
-//       }
-//     });
-//     // if (results[0].length === 0) {
-//     //   //<- ici results n'est pas un tableau/array et n'a donc pas d'attribut length
-//     //   //Regarde la valeur de results(qui est probablement un objet et cherche si il ya un tableau dedans)
-//     //   res.status(404).json({ message: "Aucun logement trouvé" });
-//     // } else {
-//     //   res.status(200).json(results);
-//     // }
-//   } catch (error) {
-//     console.error("Erreur lors de la recherche de logements:", error);
-//     res
-//       .status(500)
-//       .json({ message: "Erreur lors de la recherche de logements" });
-//   }
-// });
-
-app.use("/uss", async (req, res) => {
-  console.log("USS HERE");
 });
 
 app.listen(port, () => console.log(`Example app listening on port ${port}!`));
