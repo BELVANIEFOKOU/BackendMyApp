@@ -30,7 +30,7 @@ Teste de bien et bonne chance.
 * [Node.js](https://nodejs.org/en/)
 
 
-## Estimation de la situation & Testons ensemble CC.
+## Estimation de la situation & Testons ensemble CC⛔.
 ### -> Route d'inscription
 - Utilisation de transactions pour garantir l'intégrité des données
 - Meilleure gestion des erreurs et des exceptions (pour pas que ca crache n'importe comment tu vois?)
